@@ -122,11 +122,70 @@ ORDER BY total_cost DESC;
 Backorder and damaged products....
 
 SELECT warehouse_id, SUM(backorder_quantity) AS backorders, SUM(damaged_goods) AS damaged
-FROM supplychain
+FROM warehouse_data_cl
 GROUP BY warehouse_id
 ORDER BY backorders DESC;
 
+Top 10 Largest distance Locations......
 
+SELECT
+    Location,
+    AVG(Lead_Time_Days + Shipping_Time_Days) AS avg_distance_days
+FROM supplychain
+GROUP BY Location
+ORDER BY avg_distance_days DESC
+LIMIT 10;
+
+
+Largest distance Warehouses......
+
+WITH location_distance AS (
+    SELECT
+        Location,
+        AVG(Lead_Time_Days + Shipping_Time_Days) AS avg_distance
+    FROM supplychain
+    GROUP BY Location
+),
+overall_avg AS (
+    SELECT AVG(avg_distance) AS overall_avg
+    FROM location_distance
+)
+SELECT
+    ld.Location,
+    ld.avg_distance,
+    CASE
+        WHEN ld.avg_distance > oa.overall_avg
+        THEN 'Large Distance'
+        ELSE 'Normal Distance'
+    END AS distance_category
+FROM location_distance ld
+CROSS JOIN overall_avg oa
+ORDER BY ld.avg_distance DESC;
+
+ Warehouses where workforce should reduce.......
+ 
+WITH warehouse_metrics AS (
+    SELECT
+        Warehouse_ID,
+        Location,
+        SUM(Monthly_Sales) / NULLIF(AVG(Employee_Count), 0) AS sales_per_employee,
+        SUM(Operational_Cost) / NULLIF(AVG(Employee_Count), 0) AS cost_per_employee
+    FROM supplychain
+    GROUP BY Warehouse_ID, Location
+),
+benchmarks AS (
+    SELECT
+        AVG(sales_per_employee) AS avg_sales_per_employee,
+        AVG(cost_per_employee) AS avg_cost_per_employee
+    FROM warehouse_metrics
+)
+SELECT
+    wm.*
+FROM warehouse_metrics wm
+CROSS JOIN benchmarks b
+WHERE wm.cost_per_employee > b.avg_cost_per_employee
+  AND wm.sales_per_employee < b.avg_sales_per_employee
+ORDER BY wm.cost_per_employee DESC;
 
 
 
